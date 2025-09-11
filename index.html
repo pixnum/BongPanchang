@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bong Panchang - Bengali Calender</title>
+<style>
+html,body{margin:0;padding:0;font-family:sans-serif;height:100%;}
+body{display:flex;justify-content:center;align-items:flex-start;background:#f5f5f5;}
+.wrapper{width:100%;min-height:100vh;display:flex;justify-content:center;align-items:center;flex-direction:column;padding-top:40px;}
+.app{background:#fff;border:2px solid #ccc;border-radius:12px;padding:20px;width:95%;max-width:500px;box-shadow:0 6px 15px rgba(0,0,0,0.15);display:flex;flex-direction:column;align-items:center;position:relative;}
+.dark-mode{background:#222;color:#eee;}
+.dark-mode .app{background:#333;border-color:#555;color:#eee;}
+.toggle{position:absolute;top:10px;right:10px;width:35px;height:35px;border-radius:50%;border:none;cursor:pointer;background:#ddd;}
+.dark-mode .toggle{background:#666;color:#fff;}
+h2,h3{text-align:center;margin:5px 0;}
+#monthYear{font-weight:bold;text-align:center;margin-top:10px;font-size:1.1em;}
+.calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:10px;width:100%;box-sizing:border-box;}
+.calendar div{padding:8px;text-align:center;border-radius:6px;cursor:pointer;font-size:14px;}
+.calendar .day{background:#eee;} 
+.calendar .festival{background:#ffefba;} 
+.calendar .highlight{outline:2px solid red; background:#ffd6d6;} 
+.dark-mode .calendar .day{background:#444;}
+.modal{position:fixed;top:0;left:0;width:100%;height:100%;display:none;justify-content:center;align-items:center;background:rgba(0,0,0,0.6);}
+.modal-content{background:#fff;padding:20px;border-radius:10px;max-width:400px;width:90%;position:relative;overflow:auto;max-height:90vh;}
+.dark-mode .modal-content{background:#333;color:#fff;}
+#closeModal{position:absolute;top:10px;right:10px;border:none;background:none;font-size:18px;cursor:pointer;}
+#modalContentText{font-size:16px;line-height:1.5;white-space:pre-line;}
+.nav-btns{display:flex;gap:10px;margin-top:5px;}
+.nav-btns button,.reset-btn{padding:6px 12px;border:none;border-radius:6px;background:#007bff;color:#fff;cursor:pointer;}
+.nav-btns button:hover,.reset-btn:hover{background:#0056b3;}
+.muhurta-span{cursor:pointer;position:relative;display:block;margin:2px 0;}
+.muhurta-span .tooltip{visibility:hidden;width:220px;background:#333;color:#fff;text-align:left;border-radius:6px;padding:8px;position:absolute;z-index:10;bottom:125%;left:50%;transform:translateX(-50%);opacity:0;transition:opacity 0.3s;font-size:13px;line-height:1.3;}
+.muhurta-span:hover .tooltip{visibility:visible;opacity:1;}
+.muhurta-span .tooltip::after{content:"";position:absolute;top:100%;left:50%;margin-left:-5px;border-width:5px;border-style:solid;border-color:#333 transparent transparent transparent;}
+input[type=number]{width:80px;padding:5px;border-radius:6px;border:1px solid #ccc;}
+footer{text-align:center;margin-top:15px;font-size:0.8em;}
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <div class="app">
+    <button class="toggle" id="toggleDark">🌓</button>
+    <h2>📅 Bong Panchang</h2>
+    <h3 id="todayDetails">Loading today’s Panchang...</h3>
+
+    <div style="display:flex;gap:10px;margin-top:10px;">
+      <input type="number" id="inputYear" placeholder="Year" min="2025" max="2100" value="">
+      <input type="number" id="inputMonth" placeholder="Month" min="1" max="12" value="">
+    </div>
+
+    <div id="monthYear"></div>
+    <div class="calendar" id="calendar"></div>
+
+    <div class="nav-btns">
+      <button id="prevMonth">⬅ Prev</button>
+      <button class="reset-btn" id="resetBtn">Reset</button>
+      <button id="nextMonth">Next ➡</button>
+    </div>
+
+    <footer>© Bong Panchang 2025</footer>
+  </div>
+</div>
+
+<div class="modal" id="dayModal">
+  <div class="modal-content">
+    <button id="closeModal">✖</button>
+    <h3>Day Details</h3>
+    <div id="modalContentText"></div>
+  </div>
+</div>
+
+<script>
+// --- Dark Mode ---
+document.getElementById('toggleDark').onclick=()=>document.body.classList.toggle('dark-mode');
+
+// --- Sample Data ---
+const festivals={"2025-1-14":"Makar Sankranti","2025-8-15":"Independence Day","2025-10-24":"Durga Puja"};
+const muhurtaNames=["Abhijit","Amrit","Rohini","Chaturthi","Shubh","Labh","Udveg","Prabha","Shakti","Siddhi","Vyaghra","Ganda","Vikari","Shoola","Priti","Dhruva","Harsha","Vighna","Ananda","Raksha","Saubhagya","Raja","Shanti","Arishta","Vijaya","Dhan","Kshema","Punya","Bhaya","Nisarga"];
+const auspicious=["Abhijit","Amrit","Rohini","Chaturthi","Shubh","Labh","Prabha","Shakti","Siddhi","Vyaghra","Ananda","Saubhagya","Raja","Shanti","Vijaya","Dhan","Kshema","Punya"];
+const inauspicious=["Udveg","Ganda","Vikari","Shoola","Priti","Dhruva","Harsha","Vighna","Raksha","Arishta","Bhaya","Nisarga"];
+const muhurtaPurpose={
+"Abhijit":"Best time for important actions, victory, and success.","Amrit":"Highly auspicious for all activities.","Rohini":"Good for weddings, ceremonies, and investments.",
+"Chaturthi":"Good for learning, arts, and spiritual works.","Shubh":"Generally auspicious for all endeavors.","Labh":"Favorable for financial and business tasks.","Udveg":"Inauspicious – avoid major decisions.",
+"Prabha":"Good for intellectual work and rituals.","Shakti":"Suitable for strength-related activities.","Siddhi":"Good for spiritual and educational pursuits.","Vyaghra":"Strong energy – good for challenging tasks.","Ganda":"Inauspicious – avoid important work.","Vikari":"Inauspicious – minor tasks only.",
+"Shoola":"Avoid major tasks, focus on routine work.","Priti":"Favorable for social and personal interactions.","Dhruva":"Good for steady and long-term work.","Harsha":"Good for celebrations and joyful activities.","Vighna":"Avoid important work – obstacles likely.","Ananda":"Good for personal happiness and joy.",
+"Raksha":"Favorable for safety, security, and protection.","Saubhagya":"Good for auspicious events and prosperity.","Raja":"Generally auspicious for leadership and authority.","Shanti":"Good for peace, meditation, and harmony.","Arishta":"Inauspicious – avoid important events.","Vijaya":"Favorable for success in endeavors.",
+"Dhan":"Good for wealth and money-related tasks.","Kshema":"Good for well-being and prosperity.","Punya":"Auspicious for religious and charitable work.","Bhaya":"Inauspicious – avoid major actions.","Nisarga":"Neutral – normal day-to-day activities."
+};
+
+// --- App State ---
+let currentYear=new Date().getFullYear(), currentMonth=new Date().getMonth()+1;
+let userLat=23.8103, userLon=90.4125, userTZ=new Date().getTimezoneOffset()/(-60);
+
+// --- Auto Location ---
+if(navigator.geolocation){
+  navigator.geolocation.getCurrentPosition(pos=>{
+    userLat=pos.coords.latitude;
+    userLon=pos.coords.longitude;
+    userTZ=-(new Date().getTimezoneOffset()/60);
+    renderCalendar(currentYear,currentMonth);
+    showToday();
+  });
+}
+
+// --- Sun Longitude ---
+function sunLongitude(date){
+  const d = (Date.UTC(date.getFullYear(),date.getMonth(),date.getDate())/86400000 + 2440587.5) - 2451545.0;
+  const g = (357.529 + 0.98560028*d) % 360;
+  const q = (280.459 + 0.98564736*d) % 360;
+  const L = (q + 1.915*Math.sin(g*Math.PI/180) + 0.020*Math.sin(2*g*Math.PI/180)) % 360;
+  return L<0?L+360:L;
+}
+
+// --- Bengali Month & Date ---
+function getBengaliMonthAndDate(date){
+    const long = sunLongitude(date);
+    const months = ["Boishakh","Joishtho","Ashar","Srabon","Bhadro","Ashwin","Kartik","Ogrohayon","Poush","Magh","Falgun","Chaitra"];
+    const index = Math.floor(long/30);
+    let bengaliYear = date.getFullYear() - 593;
+    if(index < 3) bengaliYear--; // before Boishakh
+
+    let monthStart = new Date(date);
+    while(Math.floor(sunLongitude(monthStart)/30) !== index){
+        monthStart.setDate(monthStart.getDate()-1);
+    }
+
+    const bengaliDay = Math.floor((date - monthStart)/(1000*60*60*24)) + 1;
+
+    return {day:bengaliDay, month:months[index], year:bengaliYear};
+}
+
+// --- Sunrise/Sunset ---
+function getSunTimes(date,lat,lon,tz){
+  let Jday=(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate())/86400000)+2440587.5;
+  let n=Jday-2451545.0;
+  let L=280.46+0.9856474*n;
+  let g=357.528+0.9856003*n;
+  let lambda=L+1.915*Math.sin(g*Math.PI/180)+0.02*Math.sin(2*g*Math.PI/180);
+  let epsilon=23.439-0.0000004*n;
+  let RA=Math.atan2(Math.cos(epsilon*Math.PI/180)*Math.sin(lambda*Math.PI/180),Math.cos(lambda*Math.PI/180))*180/Math.PI;
+  let decl=Math.asin(Math.sin(epsilon*Math.PI/180)*Math.sin(lambda*Math.PI/180))*180/Math.PI;
+  let latRad=lat*Math.PI/180;
+  let declRad=decl*Math.PI/180;
+  let cosH=(Math.cos(90.833*Math.PI/180)-Math.sin(latRad)*Math.sin(declRad))/(Math.cos(latRad)*Math.cos(declRad));
+  if(cosH>1)cosH=-1; if(cosH<-1)cosH=1;
+  let H=Math.acos(cosH)*180/Math.PI;
+  let sunrise=12-(H/15)-lon/15+tz;
+  let sunset=12+(H/15)-lon/15+tz;
+  return {sunrise,sunset};
+}
+
+// --- Panchang ---
+function getPanchang(date){ return {tithi:"Shukla/Paurnima",yoga:"Rukma Yoga",karana:"Bava/Kaul/Kulika"}; }
+
+// --- Muhurta ---
+function getMuhurtas(date){
+  const sun=getSunTimes(date,userLat,userLon,userTZ);
+  const start=sun.sunrise; const end=sun.sunset;
+  const total=end-start; const segment=total/30;
+  let times=[];
+  for(let i=0;i<30;i++){
+    let st=start+i*segment; let et=start+(i+1)*segment;
+    let h1=Math.floor(st); let m1=Math.floor((st-h1)*60);
+    let h2=Math.floor(et); let m2=Math.floor((et-h2)*60);
+    times.push({start:`${String(h1).padStart(2,'0')}:${String(m1).padStart(2,'0')}`,end:`${String(h2).padStart(2,'0')}:${String(m2).padStart(2,'0')}`});
+  }
+  return muhurtaNames.map((name,i)=>({...times[i],name}));
+}
+
+// --- Calendar ---
+function renderCalendar(y,m){
+  currentYear=y; currentMonth=m;
+  document.getElementById('inputYear').value=y;
+  document.getElementById('inputMonth').value=m;
+  const cal=document.getElementById('calendar'); cal.innerHTML="";
+  const date=new Date(y,m-1,1); const weekdays=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  weekdays.forEach(d=>{let wd=document.createElement('div');wd.textContent=d;wd.style.fontWeight="bold";cal.appendChild(wd);});
+  let firstDay=date.getDay(); for(let i=0;i<firstDay;i++){cal.appendChild(document.createElement('div'));}
+  const daysInMonth=new Date(y,m,0).getDate();
+  for(let d=1;d<=daysInMonth;d++){
+    let dayDiv=document.createElement('div'); dayDiv.className="day"; dayDiv.textContent=d;
+    if(festivals[`${y}-${m}-${d}`]) dayDiv.classList.add('festival');
+    dayDiv.onclick=()=>showModal(y,m,d);
+    cal.appendChild(dayDiv);
+  }
+  const bengali=getBengaliMonthAndDate(new Date(y,m-1,1));
+  document.getElementById('monthYear').textContent=`${bengali.month} ${bengali.year} | Month: ${m}, Year: ${y}`;
+}
+
+// --- Modal ---
+function showModal(y,m,d){
+  const modal=document.getElementById("dayModal");
+  const text=document.getElementById("modalContentText");
+  const fest=festivals[`${y}-${m}-${d}`]||"None";
+  const dateObj=new Date(y,m-1,d); 
+  const bengali=getBengaliMonthAndDate(dateObj);
+  const sun=getSunTimes(dateObj,userLat,userLon,userTZ);
+  const panch=getPanchang(dateObj);
+  const muhurtaData=getMuhurtas(dateObj);
+
+  const muhurtaHTML=muhurtaData.map(obj=>{
+    const color=auspicious.includes(obj.name)?"green":(inauspicious.includes(obj.name)?"red":"black");
+    return `<span class="muhurta-span" style="color:${color}">${obj.name} ${obj.start}-${obj.end}<span class="tooltip">${muhurtaPurpose[obj.name]}</span></span>`;
+  }).join("");
+
+  text.innerHTML=`Gregorian: ${d}-${m}-${y}\nBengali: ${bengali.day} ${bengali.month} ${bengali.year}\nSunrise: ${sun.sunrise.toFixed(2)}h\nSunset: ${sun.sunset.toFixed(2)}h\nTithi: ${panch.tithi}\nYoga: ${panch.yoga}\nKarana: ${panch.karana}\nFestival: ${fest}\n\nMuhurtas:\n${muhurtaHTML}`;
+  modal.style.display="flex";
+}
+document.getElementById("closeModal").onclick=()=>{document.getElementById("dayModal").style.display="none";};
+
+// --- Navigation ---
+document.getElementById("prevMonth").onclick=()=>{if(currentMonth===1){currentMonth=12;currentYear--;}else currentMonth--; renderCalendar(currentYear,currentMonth);}
+document.getElementById("nextMonth").onclick=()=>{if(currentMonth===12){currentMonth=1;currentYear++;}else currentMonth++; renderCalendar(currentYear,currentMonth);}
+document.getElementById("resetBtn").onclick=()=>{currentYear=new Date().getFullYear();currentMonth=new Date().getMonth()+1;renderCalendar(currentYear,currentMonth);showToday();}
+document.getElementById("inputYear").onchange=(e)=>{currentYear=parseInt(e.target.value);renderCalendar(currentYear,currentMonth);}
+document.getElementById("inputMonth").onchange=(e)=>{currentMonth=parseInt(e.target.value);renderCalendar(currentYear,currentMonth);}
+
+// --- Show Today ---
+function showToday(){
+  const today=new Date();
+  const beng=getBengaliMonthAndDate(today);
+  document.getElementById("todayDetails").textContent=`Today: ${today.getDate()}-${today.getMonth()+1}-${today.getFullYear()} | Bengali: ${beng.day} ${beng.month} ${beng.year}`;
+}
+
+// --- Initial Render ---
+renderCalendar(currentYear,currentMonth);
+showToday();
+</script>
+</body>
+</html>
